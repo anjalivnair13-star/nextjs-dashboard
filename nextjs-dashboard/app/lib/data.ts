@@ -177,6 +177,15 @@ export async function fetchInvoiceById(id: string) {
     };
   } catch (error) {
     console.error('API Error:', error);
+
+    // If the API returned 404, return null
+    if (
+      error instanceof Error &&
+      error.message.includes('404')
+    ) {
+      return null;
+    }
+
     throw new Error('Failed to fetch invoice.');
   }
 }

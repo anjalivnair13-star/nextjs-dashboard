@@ -61,3 +61,34 @@ export async function GET(request: NextRequest) {
     ),
   });
 }
+// POST - Create a new invoice
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+
+    const newInvoice = {
+      id: crypto.randomUUID(),
+      customer_id: body.customer_id,
+      amount: body.amount,
+      status: body.status,
+      date: body.date,
+    };
+
+    mockInvoices.push(newInvoice);
+
+    return Response.json(newInvoice, {
+      status: 201,
+    });
+  } catch (error) {
+    console.error('POST /api/invoices error:', error);
+
+    return Response.json(
+      {
+        error: 'Failed to create invoice',
+      },
+      {
+        status: 500,
+      },
+    );
+  }
+}
