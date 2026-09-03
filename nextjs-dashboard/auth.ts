@@ -1,43 +1,71 @@
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
-import { authConfig } from './auth.config';
 import { z } from 'zod';
-import type { User } from '@/app/lib/definitions';
-import bcrypt from 'bcrypt';
-import postgres from 'postgres';
- 
-const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
- 
-async function getUser(email: string): Promise<User | undefined> {
-  try {
-    const user = await sql<User[]>`SELECT * FROM users WHERE email=${email}`;
-    return user[0];
-  } catch (error) {
-    console.error('Failed to fetch user:', error);
-    throw new Error('Failed to fetch user.');
-  }
-}
- 
-export const { auth, signIn, signOut } = NextAuth({
+import { authConfig } from './auth.config';
+
+export const {
+  handlers,
+  auth,
+  signIn,
+  signOut,
+} = NextAuth({
   ...authConfig,
+
+  secret: process.env.AUTH_SECRET,
+
   providers: [
     Credentials({
       async authorize(credentials) {
         const parsedCredentials = z
-          .object({ email: z.string().email(), password: z.string().min(6) })
+          .object({
+            email: z.string().email(),
+            password: z.string().min(6),
+          })
           .safeParse(credentials);
- 
-        if (parsedCredentials.success) {
-          const { email, password } = parsedCredentials.data;
-          const user = await getUser(email);
-          if (!user) return null;
-        const passwordsMatch = await bcrypt.compare(password, user.password);
-          if (passwordsMatch) {
-            return user;
-          }
+
+        if (!parsedCredentials.success) {
+          console.log('Invalid credentials format');
+          return null;
         }
- 
-        return null;
+
+        const { email, password } =
+          parsedCredentials.data;
+
+        try {
+          const response = await fetch(
+            'http://localhost:3000/api/users',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                email,
+                password,
+              }),
+            },
+          );
+
+          if (!response.ok) {
+            console.log('Invalid credentials');
+            return null;
+          }
+
+          const user = await response.json();
+
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+          };
+        } catch (error) {
+          console.error(
+            'Authentication API error:',
+            error,
+          );
+
+          return null;
+        }
       },
     }),
   ],
